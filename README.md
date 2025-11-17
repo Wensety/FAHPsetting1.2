@@ -1,7 +1,7 @@
 # FAHP (模糊層次分析法) 分析程式
 
-> Version 1.0
-> Latest: Version 1.1
+> Version 1.2
+> Latest: Version 1.2
 
 這是一個使用 Python 實作的模糊層次分析法（Fuzzy Analytic Hierarchy Process, FAHP）分析程式，支援從 Excel 檔案讀取資料進行分析。
 
