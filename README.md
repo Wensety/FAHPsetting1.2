@@ -39,8 +39,8 @@ from fahp_analysis import FAHPAnalyzer
 # 建立分析器
 analyzer = FAHPAnalyzer()
 
-# 從Excel讀取資料
-analyzer.read_excel('input_data.xlsx')
+# 從Excel讀取資料（包含優先度）
+analyzer.read_excel('input_data.xlsx', indicators_sheet='Indicators')
 
 # 定義比較矩陣（1-9尺度）
 criteria_comparison = [
@@ -111,10 +111,21 @@ py batch_fahp.py --input "D:\Path\To\Folder" --pattern "*.xlsx" --output batch_f
 分析結果會匯出到 Excel 檔案，包含：
 
 - **Criteria_Weights**: 準則權重（包含模糊數）
+- **Indicator_Global_Weights**: 指標全域權重（包含優先度，如果有）
+- **Indicators_***: 各構面下的指標權重（包含優先度，如果有）
 - **Final_Ranking**: 最終排名
 - **Alt_Weights_***: 各準則下的方案權重
 
+### 優先度功能
+
+在 `Indicators` 工作表中，可以添加一個優先度欄位（欄位名稱可以是：`priority`、`優先度`、`優先級`、`重要性`），系統會自動讀取並在分析結果中包含優先度資訊。
+
 ## 版本
+
+- Version 1.2
+  - 新增優先度（Priority）讀取功能：可從 `Indicators` 工作表的優先度欄位讀取指標優先度。
+  - 優先度欄位支援多種命名：`priority`、`優先度`、`優先級`、`重要性`。
+  - 分析結果中自動包含優先度資訊，並在匯出的 Excel 中顯示。
 
 - Version 1.1
   - 新增批次處理：可一次匯入多個問卷 xlsx，輸出指標/構面權重的跨檔案比較與平均。

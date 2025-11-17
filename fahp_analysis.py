@@ -14,7 +14,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # 版本資訊
-__version__ = "1.1"
+__version__ = "1.2"
 
 
 # 問卷預設結構：主軸構面與其下的策略指標
@@ -92,6 +92,7 @@ class FAHPAnalyzer:
         self.criteria_names = []
         self.alternatives_names = []
         self.indicator_names: Dict[str, List[str]] = {}
+        self.priority: Dict[str, Dict[str, float]] = {}  # 優先度：{構面: {指標: 優先度值}}
         self.fuzzy_matrices = {}
         self.weights = {}
         
@@ -165,11 +166,31 @@ class FAHPAnalyzer:
                             else:
                                 indicator_col = indicators_df.columns[0]
 
+                        # 檢查是否有優先度欄位
+                        candidate_priority_cols = ['priority', '優先度', '優先級', '重要性']
+                        priority_col = next((column_map[name] for name in candidate_priority_cols if name in column_map), None)
+                        
                         grouped = indicators_df[[criterion_col, indicator_col]].dropna(how='all')
                         for criterion, subset in grouped.groupby(criterion_col):
                             indicators = subset[indicator_col].dropna().astype(str).tolist()
                             if indicators:
                                 self.indicator_names[str(criterion)] = indicators
+                                
+                                # 讀取優先度（如果有）
+                                if priority_col and priority_col in subset.columns:
+                                    priority_dict = {}
+                                    for idx, row in subset.iterrows():
+                                        indicator = str(row[indicator_col])
+                                        priority_val = row[priority_col]
+                                        if pd.notna(priority_val):
+                                            try:
+                                                priority_dict[indicator] = float(priority_val)
+                                            except (ValueError, TypeError):
+                                                priority_dict[indicator] = None
+                                    if priority_dict:
+                                        if str(criterion) not in self.priority:
+                                            self.priority[str(criterion)] = {}
+                                        self.priority[str(criterion)].update(priority_dict)
 
                         # 若尚未讀取到構面名稱，使用指標表的唯一值
                         if not self.criteria_names and criterion_col:
@@ -179,6 +200,9 @@ class FAHPAnalyzer:
                         if self.indicator_names:
                             summary = {k: len(v) for k, v in self.indicator_names.items()}
                             print(f"讀取到 {len(self.indicator_names)} 個構面的指標: {summary}")
+                            if self.priority:
+                                priority_summary = {k: len(v) for k, v in self.priority.items()}
+                                print(f"讀取到優先度資料: {priority_summary}")
                         else:
                             print(f"警告: 無法自 {indicators_sheet} 解析指標資料")
                 except Exception as e:
@@ -523,7 +547,13 @@ class FAHPAnalyzer:
                     for label_index, indicator_label in enumerate(indicator_labels):
                         local_weight = float(indicator_weights[criterion][label_index])
                         global_weight = float(criteria_crisp_weights[criterion_index] * local_weight)
-                        indicator_global_weights.append({
+                        
+                        # 讀取優先度（如果有）
+                        priority_value = None
+                        if criterion in self.priority and indicator_label in self.priority[criterion]:
+                            priority_value = self.priority[criterion][indicator_label]
+                        
+                        item = {
                             'Criterion': criterion,
                             'Indicator': indicator_label,
                             'Local_Weight': local_weight,
@@ -532,7 +562,13 @@ class FAHPAnalyzer:
                             'Fuzzy_Lower': float(fuzzy_matrix[label_index, 0]),
                             'Fuzzy_Middle': float(fuzzy_matrix[label_index, 1]),
                             'Fuzzy_Upper': float(fuzzy_matrix[label_index, 2])
-                        })
+                        }
+                        
+                        # 如果有優先度，添加到結果中
+                        if priority_value is not None:
+                            item['Priority'] = priority_value
+                        
+                        indicator_global_weights.append(item)
 
                 indicator_ranking = sorted(
                     [(item['Indicator'], item['Criterion'], item['Global_Weight']) for item in indicator_global_weights],
@@ -562,6 +598,7 @@ class FAHPAnalyzer:
         self.criteria_names = []
         self.alternatives_names = []
         self.indicator_names = {}
+        self.priority = {}
 
         # 讀基本表
         self.read_excel(
@@ -740,6 +777,16 @@ class FAHPAnalyzer:
                             'Fuzzy_Middle': fuzzy_matrix[:, 1],
                             'Fuzzy_Upper': fuzzy_matrix[:, 2]
                         })
+                    
+                    # 添加優先度（如果有）
+                    if criterion in self.priority:
+                        priority_values = [
+                            self.priority[criterion].get(ind, None) 
+                            for ind in indicator_labels
+                        ]
+                        if any(p is not None for p in priority_values):
+                            data['Priority'] = priority_values
+                    
                     indicator_df = pd.DataFrame(data)
                     sheet_name = f'Indicators_{criterion}'
                     if len(sheet_name) > 31:

@@ -1,0 +1,57 @@
+FAHP 分析系統使用說明
+====================
+
+檔案結構
+--------
+主要檔案：
+  - main.py              : 主執行檔（批次分析與統計報表生成）
+  - fahp_analysis.py     : 核心分析模組
+  - batch_fahp.py         : 簡單批次處理腳本
+  - generate_template.py  : 問卷模板生成工具
+
+資料夾：
+  - runtest/             : 問卷樣本資料夾
+  - old/                 : 舊版本與測試檔案
+
+使用方法
+--------
+1. 基本使用（處理 runtest 資料夾中的所有 xlsx 檔案）：
+   python main.py
+
+2. 指定輸入資料夾：
+   python main.py --input runtest
+
+3. 指定檔案樣式和輸出檔名：
+   python main.py --input runtest --pattern "*.xlsx" --output my_report.xlsx
+
+4. 使用簡單批次處理（不包含統計分析）：
+   python batch_fahp.py --input runtest --pattern "*.xlsx" --output batch_results.xlsx
+
+5. 生成問卷模板：
+   python generate_template.py
+
+輸出報表內容
+-----------
+統計分析報表包含以下工作表：
+  - 指標統計分析    : 各指標的統計資訊（平均、標準差、變異係數等）
+  - 構面統計分析    : 各構面的統計資訊
+  - 指標權重對照表  : 各檔案指標權重對照
+  - 構面權重對照表  : 各檔案構面權重對照
+  - 優先度統計      : 優先度統計資訊（如果有優先度資料）
+  - 排名分析        : 各指標的平均排名
+  - File_*          : 各檔案的詳細結果
+
+注意事項
+--------
+- 確保問卷 Excel 檔案包含以下工作表：
+  * Criteria      : 構面列表
+  * Comparisons   : 構面比較矩陣
+  * Indicators    : 指標列表（可選：包含優先度欄位）
+  * Pairwise_*     : 各構面的指標比較矩陣
+
+- 優先度欄位名稱可以是：priority、優先度、優先級、重要性
+
+版本資訊
+--------
+Version 1.2
+
