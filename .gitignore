@@ -36,7 +36,12 @@ env/
 .DS_Store
 Thumbs.db
 
-# Project specific (uncomment if you don't want to track Excel files)
-# *.xlsx
-# *.xls
+# Project specific
+*.xlsx
+*.xls
+~$*.xlsx
+~$*.xls
+statistical_report.xlsx
+batch_fahp_results.xlsx
+fahp_results.xlsx
 
