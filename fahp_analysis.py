@@ -238,23 +238,52 @@ class FAHPAnalyzer:
             df = pd.read_excel(file_path, sheet_name=sheet_name, 
                              header=header_row, index_col=index_col)
             
+            if df.empty:
+                raise ValueError(f"工作表 {sheet_name} 為空")
+            
             # 轉換為數值矩陣
             matrix = []
-            for i in range(len(df)):
+            n_rows = len(df)
+            n_cols = len(df.columns)
+            
+            if n_rows == 0 or n_cols == 0:
+                raise ValueError(f"工作表 {sheet_name} 沒有有效的數據")
+            
+            for i in range(n_rows):
                 row = []
-                for j in range(len(df.columns)):
-                    value = df.iloc[i, j]
-                    # 處理字串形式的分數（如 "1/3"）
-                    if isinstance(value, str) and '/' in value:
-                        parts = value.split('/')
-                        if len(parts) == 2:
-                            value = float(parts[0]) / float(parts[1])
+                for j in range(n_cols):
+                    try:
+                        value = df.iloc[i, j]
+                        # 處理 NaN 值
+                        if pd.isna(value):
+                            # 如果是對角線，設為 1；否則設為 NaN 並在後續處理
+                            if i == j:
+                                value = 1.0
+                            else:
+                                raise ValueError(f"位置 [{i}][{j}] 的值為空")
+                        
+                        # 處理字串形式的分數（如 "1/3"）
+                        if isinstance(value, str) and '/' in value:
+                            parts = value.split('/')
+                            if len(parts) == 2:
+                                value = float(parts[0]) / float(parts[1])
+                            else:
+                                value = float(value)
                         else:
                             value = float(value)
-                    else:
-                        value = float(value)
-                    row.append(value)
+                        row.append(value)
+                    except (ValueError, TypeError) as e:
+                        raise ValueError(
+                            f"工作表 {sheet_name} 位置 [{i}][{j}] 的值無法轉換為數值: {e}"
+                        ) from e
                 matrix.append(row)
+            
+            # 驗證矩陣是否為方陣
+            if n_rows != n_cols:
+                raise ValueError(
+                    f"比較矩陣不是方陣：{n_rows} 行 x {n_cols} 列。"
+                    f"比較矩陣必須是方陣（行數等於列數）"
+                )
             
             print(f"成功從 {sheet_name} 讀取 {len(matrix)}x{len(matrix[0])} 比較矩陣")
             return matrix
@@ -276,7 +305,21 @@ class FAHPAnalyzer:
         comparison_values : List[List[float]]
             比較值矩陣，每個值代表重要性比例（1-9尺度）
         """
+        if not comparison_values or len(comparison_values) == 0:
+            raise ValueError(f"矩陣 {matrix_name} 為空")
+        
         n = len(comparison_values)
+        
+        # 驗證矩陣是否為方陣且大小一致
+        for i, row in enumerate(comparison_values):
+            if not isinstance(row, (list, np.ndarray)):
+                raise ValueError(f"矩陣 {matrix_name} 第 {i} 行不是列表或數組")
+            if len(row) != n:
+                raise ValueError(
+                    f"矩陣 {matrix_name} 不是方陣：第 {i} 行有 {len(row)} 個元素，"
+                    f"但期望 {n} 個元素"
+                )
+        
         fuzzy_matrix = np.zeros((n, n, 3))  # 每個元素是三角模糊數 (l, m, u)
         
         # 模糊化函數：將清晰值轉換為三角模糊數
@@ -286,7 +329,13 @@ class FAHPAnalyzer:
                     # 對角線元素為 (1, 1, 1)
                     fuzzy_matrix[i, j] = [1.0, 1.0, 1.0]
                 else:
-                    crisp_value = comparison_values[i][j]
+                    try:
+                        crisp_value = float(comparison_values[i][j])
+                    except (IndexError, TypeError, ValueError) as e:
+                        raise ValueError(
+                            f"矩陣 {matrix_name} 位置 [{i}][{j}] 的值無效: {e}"
+                        ) from e
+                    
                     # 將清晰值轉換為三角模糊數
                     # 使用標準的模糊化方法
                     l, m, u = self._fuzzify_value(crisp_value)
@@ -613,11 +662,23 @@ class FAHPAnalyzer:
             criteria_comparison = self.read_comparison_matrix_from_excel(
                 excel_file, 'Comparisons', header_row=0, index_col=0
             )
+            # 驗證矩陣大小與構面數量匹配
+            if self.criteria_names and len(criteria_comparison) != len(self.criteria_names):
+                print(
+                    f"警告: Comparisons 矩陣大小 ({len(criteria_comparison)}) "
+                    f"與構面數量 ({len(self.criteria_names)}) 不匹配，"
+                    f"將使用預設矩陣"
+                )
+                raise ValueError("矩陣大小不匹配")
         except Exception as exc:
             print(f"警告: 無法讀取 Comparisons，改用預設；原因: {exc}")
             if not self.criteria_names:
                 self.criteria_names = list(QUESTIONNAIRE_STRUCTURE.keys())
             criteria_comparison = DEFAULT_CRITERIA_COMPARISON
+            # 確保預設矩陣大小正確
+            if len(criteria_comparison) != len(self.criteria_names):
+                print(f"調整預設矩陣大小以匹配構面數量 ({len(self.criteria_names)})")
+                criteria_comparison = _generate_sample_matrix(len(self.criteria_names), step=1.8)
 
         # 指標映射與比較矩陣
         if not self.criteria_names:
